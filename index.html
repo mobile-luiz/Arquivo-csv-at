@@ -130,19 +130,19 @@
 
     <script>
         let extractedData = [];
-        let fullText = '';
-
+        let nomePrefeituraExtraido = 'PREFEITURA';
+    
         function convertPDF() {
             const file = document.getElementById('pdf-upload').files[0];
             if (!file) {
                 alert("Por favor, envie um arquivo PDF.");
                 return;
             }
-
+    
             const reader = new FileReader();
             reader.onload = function() {
                 const typedarray = new Uint8Array(this.result);
-
+    
                 pdfjsLib.getDocument(typedarray).promise.then(async function(pdf) {
                     let text = '';
                     for (let i = 1; i <= pdf.numPages; i++) {
@@ -153,39 +153,52 @@
                     }
                     processText(text);
                 });
-
+    
                 const pdfURL = URL.createObjectURL(file);
                 document.getElementById('pdf-viewer').src = pdfURL;
                 document.getElementById('pdf-viewer').style.display = 'block';
             };
             reader.readAsArrayBuffer(file);
         }
-
+    
         function processText(text) {
-            fullText = text;
             document.getElementById('output').innerText = text;
-
+    
             const linhas = text.split('\n');
-            let nome_prefeitura = linhas.find(linha => linha.toUpperCase().includes("PREFEITURA")) || "Prefeitura não identificada";
-            document.querySelector('#prefeitura-titulo .nome').textContent = nome_prefeitura.toUpperCase();
+            let linhaPrefeituraCompleta = linhas.find(linha => linha.toUpperCase().includes("PREFEITURA")) || "Prefeitura não identificada";
+    
+            // Captura o nome completo até encontrar "CNPJ" ou "CEP" ou fim da linha
+            let nomeMatch = linhaPrefeituraCompleta.match(/PREFEITURA\s+([A-Z\s]+)/i);
+            if (nomeMatch && nomeMatch[1]) {
+                nomePrefeituraExtraido = 'PREFEITURA ' + nomeMatch[1].trim();
+            } else {
+                nomePrefeituraExtraido = linhaPrefeituraCompleta.trim();
+            }
+    
+            document.querySelector('#prefeitura-titulo .nome').textContent = nomePrefeituraExtraido.toUpperCase();
             document.getElementById('prefeitura-titulo').style.display = 'block';
-
+    
             const regex = /(\d{1,2}(?:\.\d{1,2}){1,6})\s+(.+?)\s{2,}([0-9.]+,[0-9]{2})\s+([0-9.]+,[0-9]{2})/g;
             let match;
-            extractedData = [["Código", "Descrição da Rubrica", "Previsto", "Arrecadado até Mês"]];
+            extractedData = [];
             while ((match = regex.exec(text)) !== null) {
-                extractedData.push([match[1], match[2], match[3], match[4]]);
+                extractedData.push([nomePrefeituraExtraido, match[1], match[2], match[3], match[4]]);
             }
-
-            if (extractedData.length > 1) {
+    
+            if (extractedData.length > 0) {
                 document.getElementById('download-btn').style.display = 'inline-block';
             } else {
                 alert("Nenhum dado encontrado.");
             }
         }
-
+    
         function downloadCSV() {
-            const csv = Papa.unparse(extractedData, { delimiter: ";" });
+            const csvContent = [
+                ["PREFEITURA", "Código", "Descrição da Rubrica", "Previsto", "Arrecadado até Mês"],
+                ...extractedData
+            ];
+    
+            const csv = Papa.unparse(csvContent, { delimiter: ";" });
             const blob = new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
@@ -195,5 +208,6 @@
             document.body.removeChild(link);
         }
     </script>
+    
 </body>
 </html>
